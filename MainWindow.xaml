@@ -7,8 +7,10 @@
         Title="MainWindow"
         Width="1200"
         Height="900"
+        FontSize="16"
         WindowStartupLocation="CenterScreen"
-        mc:Ignorable="d">
+        mc:Ignorable="d"
+        Loaded="Window_Loaded">
 
     <DockPanel>
         <Menu DockPanel.Dock="Top">
@@ -147,8 +149,8 @@
                                                            Content="{Binding Name}" />
                                                     <TextBox Width="260"
                                                              Margin="6,0"
-                                                             Text="{Binding EditValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                             local:FocusBehavior.NotifyOnFocus="True" />
+                                                             local:FocusBehavior.NotifyOnFocus="True"
+                                                             Text="{Binding EditValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                                     <TextBlock Margin="6,0"
                                                                VerticalAlignment="Center"
                                                                Foreground="Gray"
@@ -170,16 +172,17 @@
                         </Grid>
                     </TabItem>
                 </TabControl>
-                <TextBlock x:Name="txtDetail"
-                           Width="444"
-                           Height="80"
-                           Margin="0,760,0,0"
-                           HorizontalAlignment="Center"
-                           VerticalAlignment="Top"
-                           ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                           ScrollViewer.VerticalScrollBarVisibility="Auto"
-                           Text="{Binding SelectedColumn.EditValue, Mode=OneWay}"
-                           TextWrapping="Wrap" />
+                <ScrollViewer x:Name="txtDetail"
+                              Width="444"
+                              Height="80"
+                              Margin="0,760,0,0"
+                              HorizontalAlignment="Center"
+                              VerticalAlignment="Top"
+                              HorizontalScrollBarVisibility="Disabled"
+                              VerticalScrollBarVisibility="Auto">
+                    <TextBlock Text="{Binding SelectedColumn.EditValue, Mode=OneWay}"
+                               TextWrapping="Wrap" />
+                </ScrollViewer>
 
                 <!--  Splitter between top list and buttons/item area  -->
 

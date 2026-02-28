@@ -19,11 +19,9 @@ public class ColumnInfo : ObservableObject {
 		get => _editValue;
 		set => SetProperty(ref _editValue, value);
 	}
-
 	// store original value for revert / dirty-check
 	public string? OriginalValue { get; set; }
 }
-
 
 public partial class MainViewModel : ObservableObject {
 	private readonly Services.DatabaseService _dbService = new Services.DatabaseService();
@@ -35,7 +33,6 @@ public partial class MainViewModel : ObservableObject {
 		get => _selectedTableView;
 		private set => SetProperty(ref _selectedTableView, value);
 	}
-
 	[CommunityToolkit.Mvvm.ComponentModel.ObservableProperty]
 	private int _selectedTabIndex;
 
@@ -93,6 +90,20 @@ public partial class MainViewModel : ObservableObject {
 	public MainViewModel() {
 		LoadHistory();
 		LoadSqlHistory();
+		// update command can-execute when columns or selection change
+		Columns.CollectionChanged += (s, e) => UpdateCommandStates();
+	}
+
+	private bool CanSaveCurrentEdit() {
+		return _currentRow != null && Columns.Count > 0;
+	}
+
+	private bool CanDeleteCurrent() {
+		return _currentRow != null && Columns.Count > 0;
+	}
+
+	private bool CanAddNew() {
+		return Columns.Count > 0 && !string.IsNullOrWhiteSpace(_currentDatabasePath) && !string.IsNullOrWhiteSpace(SelectedTable);
 	}
 
 	private void LoadSqlHistory() {
@@ -196,6 +207,35 @@ public partial class MainViewModel : ObservableObject {
 		SaveHistory();
 	}
 
+	/// <summary>
+	/// Try to open the most recent database from history (first entry).
+	/// Returns null on success, or an error message on failure.
+	/// </summary>
+	public async Task<string?> TryOpenMostRecentAsync() {
+		if (History.Count == 0) return null;
+		var path = History[0];
+		if (string.IsNullOrWhiteSpace(path)) return null;
+		if (!File.Exists(path)) {
+			// remove missing entry from history and persist
+			History.Remove(path);
+			SaveHistory();
+			return $"ファイルが見つかりません: {path} (履歴から削除しました)";
+		}
+		try {
+			await OpenDatabaseAsync(path);
+			return null;
+		}
+		catch (Exception ex) {
+			// if open failed, remove from history to avoid repeated failures
+			try {
+				History.Remove(path);
+				SaveHistory();
+			}
+			catch { }
+			return ex.Message + " (履歴から削除しました)";
+		}
+	}
+
 	private async Task LoadSelectedTableAsync() {
 		if (string.IsNullOrWhiteSpace(_currentDatabasePath) || string.IsNullOrWhiteSpace(SelectedTable)) return;
 		try {
@@ -255,6 +295,23 @@ public partial class MainViewModel : ObservableObject {
 
 		SubscribeColumnChange();
 		HasPendingEdits = false;
+		UpdateCommandStates();
+	}
+
+	private void UpdateCommandStates() {
+		try {
+			// generated relay commands expose NotifyCanExecuteChanged
+			SaveCurrentEditCommand.NotifyCanExecuteChanged();
+		}
+		catch { }
+		try {
+			DeleteCurrentCommand.NotifyCanExecuteChanged();
+		}
+		catch { }
+		try {
+			AddNewCommand.NotifyCanExecuteChanged();
+		}
+		catch { }
 	}
 
 	private void SubscribeColumnChange() {
@@ -365,6 +422,66 @@ public partial class MainViewModel : ObservableObject {
 			AddSqlHistory(sql);
 			var dt = await Task.Run(() => _dbService.ExecuteQuery(_currentDatabasePath!, sql));
 			SelectedTableView = dt.DefaultView;
+
+			// Try to detect a simple FROM <table> and populate Columns for quick edit
+			await TryPopulateColumnsFromSelectAsync(sql);
+		}
+		catch { }
+	}
+
+	/// <summary>
+	/// If the SQL is a simple select from a single table (e.g. "select ... from TableName ..."),
+	/// populate the Columns collection for that table so the Edit tab can show editable fields.
+	/// This is a best-effort parser and intentionally conservative to avoid treating subqueries as tables.
+	/// </summary>
+	private async Task TryPopulateColumnsFromSelectAsync(string sql) {
+		if (string.IsNullOrWhiteSpace(sql) || string.IsNullOrWhiteSpace(_currentDatabasePath)) return;
+		try {
+			// find first FROM token and capture the following token
+			var m = Regex.Match(sql, "\\bfrom\\b\\s*(?<token>[^\\s;]+)", RegexOptions.IgnoreCase);
+			if (!m.Success) return;
+			var token = m.Groups["token"].Value.Trim();
+
+			// if token starts with '(' it may be a subquery or parenthesized table name
+			if (token.StartsWith("(", StringComparison.Ordinal)) {
+				// if it looks like a subquery (starts with (select) ), bail out
+				if (Regex.IsMatch(token, "^\\(\\s*select\\b", RegexOptions.IgnoreCase)) return;
+				// otherwise strip surrounding parentheses
+				token = token.Trim('(', ')');
+			}
+
+			// strip quotes/backticks
+			token = token.Trim('"', '\'', '`');
+
+			// token may include schema (schema.table) or alias (table AS t). Take first segment
+			var first = token.Split(new[] {'.'}, StringSplitOptions.RemoveEmptyEntries).Last();
+			first = first.Split(new[] {' ', '\t', '\r', '\n'}, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? string.Empty;
+			if (string.IsNullOrWhiteSpace(first)) return;
+
+			// validate simple identifier
+			if (!Regex.IsMatch(first, "^[A-Za-z0-9_]+$")) return;
+
+			var tableName = first;
+
+			// Load columns for the detected table
+			try {
+				var cols = await Task.Run(() => _dbService.GetTableColumns(_currentDatabasePath!, tableName));
+				if (cols != null) {
+					Columns.Clear();
+					foreach (DataRow r in cols.Rows) {
+						var ci = new ColumnInfo();
+						ci.Name = r.Table.Columns.Contains("name") && !Convert.IsDBNull(r["name"]) ? r["name"].ToString() ?? string.Empty : string.Empty;
+						ci.Type = r.Table.Columns.Contains("type") && !Convert.IsDBNull(r["type"]) ? r["type"].ToString() ?? string.Empty : string.Empty;
+						ci.NotNull = r.Table.Columns.Contains("notnull") && !Convert.IsDBNull(r["notnull"]) && Convert.ToInt32(r["notnull"]) == 1;
+						ci.PrimaryKey = r.Table.Columns.Contains("pk") && !Convert.IsDBNull(r["pk"]) && Convert.ToInt32(r["pk"]) == 1;
+						ci.EditValue = string.Empty;
+						Columns.Add(ci);
+					}
+					// switch to Edit tab so user can edit
+					SelectedTabIndex = 2;
+				}
+			}
+			catch { }
 		}
 		catch { }
 	}

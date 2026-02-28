@@ -123,4 +123,16 @@ public partial class MainWindow : Window {
 	}
 
 	// Selection and button actions are handled by ViewModel via bindings
+
+	private async void Window_Loaded(object sender, RoutedEventArgs e) {
+		try {
+			var err = await _vm.TryOpenMostRecentAsync();
+			if (!string.IsNullOrEmpty(err)) {
+				MessageBox.Show(this, $"最近のファイルを開けませんでした: {err}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+			}
+		}
+		catch (System.Exception ex) {
+			MessageBox.Show(this, $"起動時にエラーが発生しました: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+		}
+	}
 }
