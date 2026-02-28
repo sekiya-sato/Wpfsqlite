@@ -7,6 +7,7 @@
         Title="MainWindow"
         Width="1200"
         Height="900"
+        WindowStartupLocation="CenterScreen"
         mc:Ignorable="d">
 
     <DockPanel>
@@ -52,7 +53,9 @@
                   Margin="8">
                 <!--  Top: original Tabs  -->
                 <TabControl x:Name="TableListArea"
-                            Grid.Row="0">
+                            Grid.Row="0"
+                            Margin="0,0,0,95"
+                            SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}">
                     <TabItem Header="Tables">
                         <ListBox MinWidth="160"
                                  MaxHeight="400"
@@ -103,17 +106,17 @@
                                         Orientation="Horizontal">
                                 <Button Width="80"
                                         Margin="4"
-                                        Click="ModifyButton_Click">
+                                        Command="{Binding SaveCurrentEditCommand}">
                                     修正
                                 </Button>
                                 <Button Width="80"
                                         Margin="4"
-                                        Click="AddButton_Click">
+                                        Command="{Binding AddNewCommand}">
                                     追加
                                 </Button>
                                 <Button Width="80"
                                         Margin="4"
-                                        Click="DeleteButton_Click">
+                                        Command="{Binding DeleteCurrentCommand}">
                                     削除
                                 </Button>
                             </StackPanel>
@@ -144,7 +147,8 @@
                                                            Content="{Binding Name}" />
                                                     <TextBox Width="260"
                                                              Margin="6,0"
-                                                             Text="{Binding EditValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                                             Text="{Binding EditValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                             local:FocusBehavior.NotifyOnFocus="True" />
                                                     <TextBlock Margin="6,0"
                                                                VerticalAlignment="Center"
                                                                Foreground="Gray"
@@ -166,6 +170,16 @@
                         </Grid>
                     </TabItem>
                 </TabControl>
+                <TextBlock x:Name="txtDetail"
+                           Width="444"
+                           Height="80"
+                           Margin="0,760,0,0"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Top"
+                           ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                           ScrollViewer.VerticalScrollBarVisibility="Auto"
+                           Text="{Binding SelectedColumn.EditValue, Mode=OneWay}"
+                           TextWrapping="Wrap" />
 
                 <!--  Splitter between top list and buttons/item area  -->
 
@@ -206,7 +220,8 @@
                             Width="100"
                             Height="32"
                             VerticalAlignment="Top"
-                            Click="ExecuteSql_Click">
+                            Command="{Binding ExecuteQueryCommand}"
+                            CommandParameter="{Binding Text, ElementName=QueryTextBox}">
                         Execute
                     </Button>
                 </Grid>
@@ -231,7 +246,7 @@
                               IsReadOnly="False"
                               ItemsSource="{Binding SelectedTableView}"
                               RowBackground="White"
-                              SelectionChanged="ListArea_SelectionChanged" />
+                              SelectedItem="{Binding SelectedRow, Mode=TwoWay}" />
                 </Border>
             </Grid>
         </Grid>

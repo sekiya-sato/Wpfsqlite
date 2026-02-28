@@ -4,6 +4,7 @@ using System.Data;
 using System.IO;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using CommunityToolkit.Mvvm.Input;
 
 namespace Wpfsqlite.ViewModels;
 
@@ -24,7 +25,7 @@ public class ColumnInfo : ObservableObject {
 }
 
 
-public class MainViewModel : ObservableObject {
+public partial class MainViewModel : ObservableObject {
 	private readonly Services.DatabaseService _dbService = new Services.DatabaseService();
 
 	public ObservableCollection<string> Tables { get; } = new ObservableCollection<string>();
@@ -33,6 +34,21 @@ public class MainViewModel : ObservableObject {
 	public DataView? SelectedTableView {
 		get => _selectedTableView;
 		private set => SetProperty(ref _selectedTableView, value);
+	}
+
+	[CommunityToolkit.Mvvm.ComponentModel.ObservableProperty]
+	private int _selectedTabIndex;
+
+	[CommunityToolkit.Mvvm.ComponentModel.ObservableProperty]
+	private System.Data.DataRowView? _selectedRow;
+
+	[CommunityToolkit.Mvvm.ComponentModel.ObservableProperty]
+	private ColumnInfo? _selectedColumn;
+
+	partial void OnSelectedRowChanged(System.Data.DataRowView? value) {
+		// update current row in viewmodel and switch to Edit tab when a row is selected
+		SetCurrentFromDataRow(value);
+		if (value != null) SelectedTabIndex = 2; // Edit tab index (Tables=0, Keys=1, Edit=2)
 	}
 
 	/// <summary>
@@ -219,20 +235,23 @@ public class MainViewModel : ObservableObject {
 		}
 
 		UnsubscribeColumnChange();
-		foreach (var c in Columns) {
-			try {
-				if (drv.Row.Table.Columns.Contains(c.Name) && drv.Row[c.Name] != null && drv.Row[c.Name] != DBNull.Value)
-					c.EditValue = drv.Row[c.Name].ToString();
-				else
-					c.EditValue = string.Empty;
+			foreach (var c in Columns) {
+				try {
+					if (drv.Row.Table.Columns.Contains(c.Name) && drv.Row[c.Name] != null && drv.Row[c.Name] != DBNull.Value) {
+						var raw = drv.Row[c.Name].ToString() ?? string.Empty;
+						c.EditValue = DecodeEscapedUnicode(raw);
+					}
+					else {
+						c.EditValue = string.Empty;
+					}
 
-				c.OriginalValue = c.EditValue;
+					c.OriginalValue = c.EditValue;
+				}
+				catch {
+					c.EditValue = string.Empty;
+					c.OriginalValue = string.Empty;
+				}
 			}
-			catch {
-				c.EditValue = string.Empty;
-				c.OriginalValue = string.Empty;
-			}
-		}
 
 		SubscribeColumnChange();
 		HasPendingEdits = false;
@@ -268,6 +287,7 @@ public class MainViewModel : ObservableObject {
 		}
 	}
 
+	[RelayCommand]
 	public async Task SaveCurrentEditAsync() {
 		if (_currentRow == null || string.IsNullOrWhiteSpace(_currentDatabasePath) || string.IsNullOrWhiteSpace(SelectedTable)) return;
 		try {
@@ -295,6 +315,7 @@ public class MainViewModel : ObservableObject {
 		catch { }
 	}
 
+	[RelayCommand]
 	public async Task DeleteCurrentAsync() {
 		if (_currentRow == null || string.IsNullOrWhiteSpace(_currentDatabasePath) || string.IsNullOrWhiteSpace(SelectedTable)) return;
 		try {
@@ -314,6 +335,7 @@ public class MainViewModel : ObservableObject {
 		catch { }
 	}
 
+	[RelayCommand]
 	public async Task AddNewAsync() {
 		if (string.IsNullOrWhiteSpace(_currentDatabasePath) || string.IsNullOrWhiteSpace(SelectedTable)) return;
 		try {
@@ -336,12 +358,57 @@ public class MainViewModel : ObservableObject {
 		HasPendingEdits = false;
 	}
 
+	[RelayCommand]
 	public async Task ExecuteQueryAsync(string sql) {
 		if (string.IsNullOrWhiteSpace(sql) || string.IsNullOrWhiteSpace(_currentDatabasePath)) return;
 		try {
+			AddSqlHistory(sql);
 			var dt = await Task.Run(() => _dbService.ExecuteQuery(_currentDatabasePath!, sql));
 			SelectedTableView = dt.DefaultView;
 		}
 		catch { }
 	}
+
+    /// <summary>
+    /// Convert escaped unicode sequences (e.g. "\\u6CC9\\u3000\\u3042\\u3086") into actual characters.
+    /// Uses JSON string unescape as primary method, falls back to Regex.Unescape.
+    /// </summary>
+    private static string DecodeEscapedUnicode(string? input) {
+        if (string.IsNullOrEmpty(input)) return input ?? string.Empty;
+        // quick check for common escape markers
+        if (!input.Contains("\\u") && !input.Contains("\\U") && !input.Contains("\\x")) return input;
+
+        // If the input looks like JSON (object/array), parse and re-serialize using a relaxed encoder
+        // so that \u escapes are converted to actual characters.
+        var trimmed = input.TrimStart();
+        if (trimmed.StartsWith("{") || trimmed.StartsWith("[")) {
+            try {
+                var obj = JsonSerializer.Deserialize<object>(input);
+                if (obj != null) {
+                    var options = new JsonSerializerOptions {
+                        WriteIndented = false,
+                        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+                    };
+                    var serialized = JsonSerializer.Serialize(obj, options);
+                    return serialized;
+                }
+            }
+            catch { /* fallthrough to other strategies */ }
+        }
+
+        try {
+            // prepare a JSON string literal: escape backslashes and quotes
+            var jsonLiteral = '"' + input.Replace("\\", "\\\\").Replace("\"", "\\\"") + '"';
+            var decoded = JsonSerializer.Deserialize<string>(jsonLiteral);
+            if (!string.IsNullOrEmpty(decoded)) return decoded;
+        }
+        catch { }
+
+        try {
+            return Regex.Unescape(input);
+        }
+        catch {
+            return input;
+        }
+    }
 }
