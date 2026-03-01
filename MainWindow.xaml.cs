@@ -3,6 +3,7 @@ using System.Collections.Specialized;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.ComponentModel;
 using Wpfsqlite.ViewModels;
 
 namespace Wpfsqlite;
@@ -17,6 +18,19 @@ public partial class MainWindow : Window {
 		InitializeComponent();
 		_vm = new MainViewModel();
 		DataContext = _vm;
+
+		if (DesignerProperties.GetIsInDesignMode(this)) {
+			_vm.Columns.Clear();
+			for (var i = 1; i <= 10; i++) {
+				_vm.Columns.Add(new ColumnInfo {
+					Name = $"DummyColumn{i}",
+					Type = "TEXT",
+					EditValue = $"Sample {i}",
+					NotNull = false,
+					PrimaryKey = i == 1
+				});
+			}
+		}
 		// populate recent menu
 		_vm.History.CollectionChanged += History_CollectionChanged;
 		PopulateRecentMenu();
@@ -63,9 +77,6 @@ public partial class MainWindow : Window {
 		Close();
 	}
 
-	private async void ExecuteSql_Click(object sender, RoutedEventArgs e) {
-		// removed: handled by ViewModel command binding
-	}
 
 	private async void CloseMenu_Click(object sender, RoutedEventArgs e) {
 		if (_vm.HasPendingEdits) {

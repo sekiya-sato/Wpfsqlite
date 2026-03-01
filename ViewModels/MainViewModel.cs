@@ -1,26 +1,26 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using System.Collections.ObjectModel;
 using System.Data;
 using System.IO;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using CommunityToolkit.Mvvm.Input;
 
 namespace Wpfsqlite.ViewModels;
 
-public class ColumnInfo : ObservableObject {
-	public string Name { get; set; } = string.Empty;
-	public string Type { get; set; } = string.Empty;
-	public bool NotNull { get; set; }
-	public bool PrimaryKey { get; set; }
-
-	private string? _editValue;
-	public string? EditValue {
-		get => _editValue;
-		set => SetProperty(ref _editValue, value);
-	}
-	// store original value for revert / dirty-check
-	public string? OriginalValue { get; set; }
+public partial class ColumnInfo : ObservableObject {
+	[ObservableProperty]
+	string name = string.Empty;
+	[ObservableProperty]
+	string type = string.Empty;
+	[ObservableProperty]
+	bool notNull;
+	[ObservableProperty]
+	bool primaryKey;
+	[ObservableProperty]
+	string? _editValue;
+	[ObservableProperty]
+	string? originalValue;
 }
 
 public partial class MainViewModel : ObservableObject {
@@ -33,13 +33,13 @@ public partial class MainViewModel : ObservableObject {
 		get => _selectedTableView;
 		private set => SetProperty(ref _selectedTableView, value);
 	}
-	[CommunityToolkit.Mvvm.ComponentModel.ObservableProperty]
+	[ObservableProperty]
 	private int _selectedTabIndex;
 
-	[CommunityToolkit.Mvvm.ComponentModel.ObservableProperty]
+	[ObservableProperty]
 	private System.Data.DataRowView? _selectedRow;
 
-	[CommunityToolkit.Mvvm.ComponentModel.ObservableProperty]
+	[ObservableProperty]
 	private ColumnInfo? _selectedColumn;
 
 	partial void OnSelectedRowChanged(System.Data.DataRowView? value) {
@@ -275,23 +275,23 @@ public partial class MainViewModel : ObservableObject {
 		}
 
 		UnsubscribeColumnChange();
-			foreach (var c in Columns) {
-				try {
-					if (drv.Row.Table.Columns.Contains(c.Name) && drv.Row[c.Name] != null && drv.Row[c.Name] != DBNull.Value) {
-						var raw = drv.Row[c.Name].ToString() ?? string.Empty;
-						c.EditValue = DecodeEscapedUnicode(raw);
-					}
-					else {
-						c.EditValue = string.Empty;
-					}
-
-					c.OriginalValue = c.EditValue;
+		foreach (var c in Columns) {
+			try {
+				if (drv.Row.Table.Columns.Contains(c.Name) && drv.Row[c.Name] != null && drv.Row[c.Name] != DBNull.Value) {
+					var raw = drv.Row[c.Name].ToString() ?? string.Empty;
+					c.EditValue = DecodeEscapedUnicode(raw);
 				}
-				catch {
+				else {
 					c.EditValue = string.Empty;
-					c.OriginalValue = string.Empty;
 				}
+
+				c.OriginalValue = c.EditValue;
 			}
+			catch {
+				c.EditValue = string.Empty;
+				c.OriginalValue = string.Empty;
+			}
+		}
 
 		SubscribeColumnChange();
 		HasPendingEdits = false;
@@ -454,8 +454,8 @@ public partial class MainViewModel : ObservableObject {
 			token = token.Trim('"', '\'', '`');
 
 			// token may include schema (schema.table) or alias (table AS t). Take first segment
-			var first = token.Split(new[] {'.'}, StringSplitOptions.RemoveEmptyEntries).Last();
-			first = first.Split(new[] {' ', '\t', '\r', '\n'}, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? string.Empty;
+			var first = token.Split(new[] { '.' }, StringSplitOptions.RemoveEmptyEntries).Last();
+			first = first.Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? string.Empty;
 			if (string.IsNullOrWhiteSpace(first)) return;
 
 			// validate simple identifier
@@ -486,46 +486,46 @@ public partial class MainViewModel : ObservableObject {
 		catch { }
 	}
 
-    /// <summary>
-    /// Convert escaped unicode sequences (e.g. "\\u6CC9\\u3000\\u3042\\u3086") into actual characters.
-    /// Uses JSON string unescape as primary method, falls back to Regex.Unescape.
-    /// </summary>
-    private static string DecodeEscapedUnicode(string? input) {
-        if (string.IsNullOrEmpty(input)) return input ?? string.Empty;
-        // quick check for common escape markers
-        if (!input.Contains("\\u") && !input.Contains("\\U") && !input.Contains("\\x")) return input;
+	/// <summary>
+	/// Convert escaped unicode sequences (e.g. "\\u6CC9\\u3000\\u3042\\u3086") into actual characters.
+	/// Uses JSON string unescape as primary method, falls back to Regex.Unescape.
+	/// </summary>
+	private static string DecodeEscapedUnicode(string? input) {
+		if (string.IsNullOrEmpty(input)) return input ?? string.Empty;
+		// quick check for common escape markers
+		if (!input.Contains("\\u") && !input.Contains("\\U") && !input.Contains("\\x")) return input;
 
-        // If the input looks like JSON (object/array), parse and re-serialize using a relaxed encoder
-        // so that \u escapes are converted to actual characters.
-        var trimmed = input.TrimStart();
-        if (trimmed.StartsWith("{") || trimmed.StartsWith("[")) {
-            try {
-                var obj = JsonSerializer.Deserialize<object>(input);
-                if (obj != null) {
-                    var options = new JsonSerializerOptions {
-                        WriteIndented = false,
-                        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
-                    };
-                    var serialized = JsonSerializer.Serialize(obj, options);
-                    return serialized;
-                }
-            }
-            catch { /* fallthrough to other strategies */ }
-        }
+		// If the input looks like JSON (object/array), parse and re-serialize using a relaxed encoder
+		// so that \u escapes are converted to actual characters.
+		var trimmed = input.TrimStart();
+		if (trimmed.StartsWith("{") || trimmed.StartsWith("[")) {
+			try {
+				var obj = JsonSerializer.Deserialize<object>(input);
+				if (obj != null) {
+					var options = new JsonSerializerOptions {
+						WriteIndented = false,
+						Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+					};
+					var serialized = JsonSerializer.Serialize(obj, options);
+					return serialized;
+				}
+			}
+			catch { /* fallthrough to other strategies */ }
+		}
 
-        try {
-            // prepare a JSON string literal: escape backslashes and quotes
-            var jsonLiteral = '"' + input.Replace("\\", "\\\\").Replace("\"", "\\\"") + '"';
-            var decoded = JsonSerializer.Deserialize<string>(jsonLiteral);
-            if (!string.IsNullOrEmpty(decoded)) return decoded;
-        }
-        catch { }
+		try {
+			// prepare a JSON string literal: escape backslashes and quotes
+			var jsonLiteral = '"' + input.Replace("\\", "\\\\").Replace("\"", "\\\"") + '"';
+			var decoded = JsonSerializer.Deserialize<string>(jsonLiteral);
+			if (!string.IsNullOrEmpty(decoded)) return decoded;
+		}
+		catch { }
 
-        try {
-            return Regex.Unescape(input);
-        }
-        catch {
-            return input;
-        }
-    }
+		try {
+			return Regex.Unescape(input);
+		}
+		catch {
+			return input;
+		}
+	}
 }
