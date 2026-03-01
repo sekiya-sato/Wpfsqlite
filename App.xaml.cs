@@ -2,7 +2,7 @@
 using System.Data;
 using System.Windows;
 
-namespace Wpfsqlite {
+namespace GikoSqlite {
 	/// <summary>
 	/// Interaction logic for App.xaml
 	/// </summary>

@@ -6,11 +6,24 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <ApplicationIcon>giko.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="giko.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="giko.ico" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="giko.ico" />
   </ItemGroup>
 
 </Project>

@@ -4,9 +4,9 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.ComponentModel;
-using Wpfsqlite.ViewModels;
+using GikoSqlite.ViewModels;
 
-namespace Wpfsqlite;
+namespace GikoSqlite;
 
 /// <summary>
 /// Interaction logic for MainWindow.xaml

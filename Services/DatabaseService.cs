@@ -1,6 +1,6 @@
 using Microsoft.Data.Sqlite;
 using System.Data;
-namespace Wpfsqlite.Services;
+namespace GikoSqlite.Services;
 
 
 public class DatabaseService {

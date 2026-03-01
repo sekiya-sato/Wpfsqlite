@@ -6,7 +6,7 @@ using System.IO;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
-namespace Wpfsqlite.ViewModels;
+namespace GikoSqlite.ViewModels;
 
 public partial class ColumnInfo : ObservableObject {
 	[ObservableProperty]

@@ -1,7 +1,7 @@
 using System.Windows;
 using System.Windows.Input;
 
-namespace Wpfsqlite;
+namespace GikoSqlite;
 
 public static class FocusBehavior {
     public static readonly DependencyProperty NotifyOnFocusProperty = DependencyProperty.RegisterAttached(
