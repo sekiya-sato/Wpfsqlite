@@ -37,22 +37,11 @@
 
 		<Grid>
 			<Grid.ColumnDefinitions>
-				<!--  allow left column to grow when dragging the center splitter  -->
 				<ColumnDefinition Width="2*" />
+				<ColumnDefinition Width="Auto" />
 				<ColumnDefinition Width="3*" />
 			</Grid.ColumnDefinitions>
 
-			<!--  Vertical splitter between left and right panes  -->
-			<GridSplitter x:Name="CenterSplitter"
-				Grid.Column="0"
-				Width="6"
-				HorizontalAlignment="Right"
-				VerticalAlignment="Stretch"
-				Background="#EEE"
-				ResizeBehavior="PreviousAndNext"
-				ResizeDirection="Columns" />
-
-			<!--  Left: Tabs for tables / keys  -->
 			<Grid Grid.Column="0"
 				Margin="8">
 				<!--  Top: original Tabs  -->
@@ -174,7 +163,7 @@
 									</ItemsControl>
 								</ScrollViewer>
 							</Border>
-							<ScrollViewer x:Name="txtDetail"
+							<TextBox x:Name="txtDetail"
 								Grid.Row="3"
 								Width="444"
 								Height="80"
@@ -182,19 +171,10 @@
 								HorizontalAlignment="Center"
 								VerticalAlignment="Top"
 								HorizontalScrollBarVisibility="Disabled"
-								VerticalScrollBarVisibility="Auto">
-
-								<TextBlock d:Text="dummy detail Text"
-									Text="{Binding SelectedColumn.EditValue, Mode=OneWay}"
-									TextWrapping="Wrap" >
-                                    <TextBlock.ToolTip>
-                                        <ToolTip>
-                                            <TextBlock Text="{Binding SelectedColumn.EditValue}" MaxWidth="800" TextWrapping="Wrap" />
-                                        </ToolTip>
-                                    </TextBlock.ToolTip>
-                                </TextBlock>
-
-                            </ScrollViewer>
+								VerticalScrollBarVisibility="Auto"
+								AcceptsReturn="True"
+								TextWrapping="Wrap"
+								Text="{Binding SelectedColumn.EditValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 						</Grid>
 					</TabItem>
 				</TabControl>
@@ -208,8 +188,16 @@
 				<!--  Bottom: Columns for selected table  -->
 			</Grid>
 
-			<!--  Right: Query panel and Data grid  -->
-			<Grid Grid.Column="1"
+			<GridSplitter x:Name="CenterSplitter"
+				Grid.Column="1"
+				Width="6"
+				HorizontalAlignment="Center"
+				VerticalAlignment="Stretch"
+				Background="#EEE"
+				ResizeBehavior="PreviousAndNext"
+				ResizeDirection="Columns" />
+
+			<Grid Grid.Column="2"
 				Margin="8">
 				<Grid.RowDefinitions>
 					<RowDefinition Height="Auto" />
